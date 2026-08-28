@@ -412,25 +412,23 @@
         </div>
       `).join('');
 
-      // Extracted URLs
+      // Extracted URLs (with mobile badge wrapping)
       const urlContainer = document.getElementById('urlContainer');
       if (data.domain_inspections && data.domain_inspections.length > 0) {
         urlContainer.innerHTML = data.domain_inspections.map(u => `
-          <div class="p-2 mb-2 bg-white border rounded d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="p-3 mb-2 bg-white border rounded d-flex flex-column gap-2">
             <div>
-              <code class="fw-bold" style="color: #0284c7;">${u.url}</code>
+              <code class="fw-bold text-break" style="color: #0284c7;">${u.url}</code>
             </div>
-            <div class="d-flex gap-1">
-              <span class="badge ${u.is_insecure_http ? 'bg-danger' : 'bg-success'}">${u.is_insecure_http ? 'No SSL (HTTP)' : 'HTTPS Secure'}</span>
-              <span class="badge ${u.is_ip ? 'bg-danger' : 'bg-secondary'}">${u.is_ip ? 'Direct IP Host' : 'Domain Host'}</span>
-              ${u.has_phish_words ? '<span class="badge bg-warning text-dark">Suspicious Keywords</span>' : ''}
+            <div class="d-flex flex-wrap gap-1 align-items-center">
+              <span class="badge ${u.is_insecure_http ? 'bg-danger' : 'bg-success'} text-wrap text-start">${u.is_insecure_http ? 'No SSL (HTTP)' : 'HTTPS Secure'}</span>
+              <span class="badge ${u.is_ip ? 'bg-danger' : 'bg-secondary'} text-wrap text-start">${u.is_ip ? 'Direct IP Host' : 'Domain Host'}</span>
+              ${u.has_phish_words ? '<span class="badge bg-warning text-dark text-wrap text-start">Suspicious Keywords</span>' : ''}
             </div>
           </div>
         `).join('');
-      } else {
-        urlContainer.innerHTML = `<p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>No clickable or embedded links detected in content.</p>`;
       }
-
+      
       // Synthetic Media Indicator
       const synthContainer = document.getElementById('syntheticContainer');
       if (data.synthetic_detection && data.synthetic_detection.is_synthetic) {
