@@ -3,6 +3,7 @@ import os
 import shutil
 from urllib.parse import urlparse
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter, ImageStat
+import numpy as np
 import pytesseract
 
 # Auto-detect Tesseract binary path
@@ -16,54 +17,62 @@ elif os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
 
 def clean_ocr_typos(text):
     """
-    Normalizes common OCR character misreads (0TP -> OTP, p1n -> pin, l1nk -> link).
+    Cleans up common OCR character substitutions and noise.
     """
     if not text:
         return ""
+    
     cleaned = text
-    typo_subs = [
+    
+    # Common OCR character substitutions
+    subs = [
         (r'\b0tp\b', 'otp'),
         (r'\b0TP\b', 'OTP'),
         (r'\bp1n\b', 'pin'),
+        (r'\bP1N\b', 'PIN'),
         (r'\bl1nk\b', 'link'),
         (r'\bcl1ck\b', 'click'),
         (r'b1ock(ed)?', r'block\1'),
-        (r'up[i!l1]\b', 'upi'),
-        (r'[\u20b9]', '₹')
+        (r'up[i!l1|]\b', 'upi'),
+        (r'[\u20b9\?]\s*(\d+)', r'₹\1'),
+        (r'\brs\.?\s*(\d+)', r'₹\1')
     ]
-    for pattern, replacement in typo_subs:
+    
+    for pattern, replacement in subs:
         cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
+        
     return cleaned
 
 
-def preprocess_screenshot(img_path):
+def preprocess_image_variants(img_path):
     """
-    Generates optimized image variants for OCR:
-    - Automatically handles dark mode by inverting dark backgrounds
-    - Upscales small screenshots for sharper character boundaries
+    Generates optimized image variants (Standard High-Contrast and Inverted)
+    to guarantee text capture across light mode, dark mode, and UI bubbles.
     """
+    variants = []
+    
     with Image.open(img_path) as raw_img:
-        # Convert to RGB then Grayscale
-        img = raw_img.convert('L')
+        # 1. Convert to RGB then Grayscale
+        img_gray = raw_img.convert('L')
         
-        # Check average brightness to detect Dark Mode
-        stat = ImageStat.Stat(img)
-        avg_brightness = stat.mean[0]
-        
-        if avg_brightness < 120:  # Dark Mode screenshot
-            img = ImageOps.invert(img)
+        # 2. Resize/Upscale for crisp character edges
+        w, h = img_gray.size
+        scale = 1.0
+        if w < 1200 or h < 1200:
+            scale = 2.0
+            new_size = (int(w * scale), int(h * scale))
+            img_gray = img_gray.resize(new_size, Image.Resampling.LANCZOS)
             
-        # Upscale if low resolution
-        w, h = img.size
-        if w < 1000 or h < 1000:
-            img = img.resize((w * 2, h * 2), Image.Resampling.LANCZOS)
-            
-        # Enhance contrast and sharpen
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.8)
-        img = img.filter(ImageFilter.SHARPEN)
+        # 3. Standard Enhanced Variant
+        enhancer = ImageEnhance.Contrast(img_gray)
+        enhanced_img = enhancer.enhance(2.0).filter(ImageFilter.SHARPEN)
+        variants.append(enhanced_img)
         
-        return img
+        # 4. Inverted Variant (for Dark Mode / White text on dark bubbles)
+        inverted_img = ImageOps.invert(enhanced_img)
+        variants.append(inverted_img)
+        
+    return variants
 
 
 def extract_urls(text):
@@ -71,7 +80,7 @@ def extract_urls(text):
     matches = re.findall(url_pattern, text)
     clean_urls = []
     for match in matches:
-        cleaned = re.sub(r'[.,;:)\'\"]+$', '', match)
+        cleaned = re.sub(r'[.,;:)\'\"\s]+$', '', match)
         if cleaned and cleaned not in clean_urls:
             clean_urls.append(cleaned)
     return clean_urls
@@ -79,7 +88,7 @@ def extract_urls(text):
 
 def inspect_domain_security(url_list):
     inspections = []
-    suspicious_keywords = ['verify', 'login', 'secure', 'update', 'kyc', 'bank', 'upi', 'claim', 'bonus', 'free', 'sbi']
+    suspicious_keywords = ['verify', 'login', 'secure', 'update', 'kyc', 'bank', 'upi', 'claim', 'bonus', 'free', 'sbi', 'portal']
     
     for url in url_list:
         parse_target = url if (url.startswith('http://') or url.startswith('https://')) else f'http://{url}'
@@ -100,23 +109,33 @@ def inspect_domain_security(url_list):
 
 
 def process_screenshot(image_path):
-    extracted_text = ""
+    extracted_texts = []
+    
     try:
-        processed_img = preprocess_screenshot(image_path)
-        # Run OCR with sparse text engine mode (--psm 11 + --psm 6)
-        text_pass1 = pytesseract.image_to_string(processed_img, config='--oem 3 --psm 6')
-        text_pass2 = pytesseract.image_to_string(processed_img, config='--oem 3 --psm 11')
+        variants = preprocess_image_variants(image_path)
         
-        # Combine unique lines from both passes
-        combined = f"{text_pass1}\n{text_pass2}"
-        extracted_text = clean_ocr_typos(combined)
+        for var_img in variants:
+            # Run multi-mode PSM passes (PSM 6 for structured blocks, PSM 11 for sparse UI text)
+            txt6 = pytesseract.image_to_string(var_img, config='--oem 3 --psm 6')
+            txt11 = pytesseract.image_to_string(var_img, config='--oem 3 --psm 11')
+            
+            if txt6.strip():
+                extracted_texts.append(txt6.strip())
+            if txt11.strip():
+                extracted_texts.append(txt11.strip())
+                
     except Exception as e:
-        print(f"[OCR Warning] Image OCR failed: {e}")
+        print(f"[OCR Warning] Image OCR pipeline encountered an issue: {e}")
 
-    extracted_urls = extract_urls(extracted_text)
+    # Combine all unique lines captured across all passes
+    combined_raw = "\n".join(extracted_texts)
+    cleaned_final_text = clean_ocr_typos(combined_raw)
+    
+    # Extract links
+    extracted_urls = extract_urls(cleaned_final_text)
     domain_report = inspect_domain_security(extracted_urls)
 
     return {
-        "text": extracted_text.strip(),
+        "text": cleaned_final_text.strip(),
         "urls": domain_report
     }
