@@ -66,16 +66,18 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
     reasons = []
     category = "Legitimate / Safe"
     
+    # 1. Normalize whitespace and clean text
     normalized_text = " ".join(raw_text.split()).lower()
 
-    # 1. Base ML Probability
+    # 2. Base ML Probability
     ml_score = 0.0
     if text_model and vectorizer and raw_text.strip():
         text_vec = vectorizer.transform([raw_text])
         ml_score = float(text_model.predict_proba(text_vec)[0][1] * 100)
 
-    # 2. Comprehensive Scam Triggers
+    # 3. High-Confidence Phishing & Smishing Triggers (Tolerant to OCR artifacts)
     scam_triggers = [
+        # Two-way communication & SMS phishing
         (
             r"please reply (yes|with|to)\b.*(representative|assist|verification code|transaction)",
             90.0,
@@ -118,6 +120,8 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Order Cancellation / Payment Phishing",
             "Creates urgency over order cancellation to solicit payment re-entry."
         ),
+        
+        # Authority / Law Enforcement / Digital Arrest
         (
             r"(police|cbi|customs|court|trai|narcotics).* (illegal transaction|arrested|case|fir|penalty|warrant).* (pay|transfer|immediately|fine)",
             96.0,
@@ -130,6 +134,8 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Digital Arrest / Authority Extortion",
             "Extortion attempt threatening arrest over alleged illegal transactions."
         ),
+
+        # Upfront Fee / Registration / Advance Fee
         (
             r"(earn|work from home|daily income|job|bonus).* (pay|registration fee|deposit|charge)",
             93.0,
@@ -149,11 +155,13 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Unsolicited prize or high-value lottery reward lure."
         ),
         (
-            r"government benefit.* (pay|charges?|submit|aadhaar)",
+            r"government benefit.* (pay|charges?|submit|aadhaar|pan)",
             92.0,
             "Government Scheme Phishing",
             "Demands verification charges and sensitive credentials for alleged government benefits."
         ),
+
+        # Credential, OTP, PIN, Card Theft
         (
             r"(send|tell us|provide|share|confirm).*(otp|verification code|pin|card details|cvv|expiry date)",
             98.0,
@@ -166,6 +174,8 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Account Takeover / OTP Phishing",
             "Deceptive security alert soliciting OTP/verification codes to hijack accounts."
         ),
+
+        # Service / Utility / Account Termination
         (
             r"(disconnected|stop working|deactivated|cancelled|blocked|deleted|locked).* (in \d+ (hours?|minutes?)|tonight|today|immediately|unless you pay).* (pay|link|call|provide|confirm)",
             95.0,
@@ -184,12 +194,16 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Account Takeover Phishing",
             "Deceptive deactivation threat prompting links or credential entry."
         ),
+
+        # Impersonation & Accidental Transfer
         (
             r"(accidentally received|by mistake|lost my phone).* (return|transfer|send).* (upi|id|account)",
             90.0,
             "Impersonation / False Refund Scam",
             "Deceptive claim of mistaken money transfer soliciting urgent UPI payments."
         ),
+
+        # Package Reschedule Fee
         (
             r"(package|parcel) could not be delivered.* pay .* (reschedule|link)",
             92.0,
@@ -207,7 +221,7 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
                 detected_category = cat
             reasons.append(desc)
 
-    # 3. Legitimate Whitelist Patterns
+    # 4. Legitimate Whitelist Patterns
     legit_rules = [
         (r"(do not|don'?t|never) share (this|your)? ?otp", "Official security advisory instructing user not to share OTP."),
         (r"if this was (you|not you).* (no action is needed|review your recent activity)", "Standard legitimate login / sign-in notification."),
@@ -246,30 +260,30 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             whitelist_reason = desc
             break
 
-    # 4. Domain & Link Reputation Factors
+    # 5. Domain & Link Reputation Factors
     for domain in domain_inspections:
         if domain.get('is_ip'):
-            scam_score = max(scam_score, 90.0)
-            detected_category = "Malicious URL / Phishing"
-            reasons.append(f"Uses direct IP address link instead of a verified domain: {domain['url']}")
+            scam_score = max(scam_score, 92.0)
+            detected_category = "Malicious URL / Direct IP Phishing"
+            reasons.append(f"Uses raw numeric IP host instead of a registered domain: {domain['url']}")
 
         if domain.get('is_insecure_http'):
-            scam_score = max(scam_score, 65.0)
-            reasons.append(f"Insecure HTTP connection detected (missing SSL/HTTPS): {domain['url']}")
+            scam_score = max(scam_score, 70.0)
+            reasons.append(f"Insecure connection detected (missing SSL/HTTPS certificate): {domain['url']}")
 
         if domain.get('has_phish_words'):
-            scam_score = max(scam_score, 88.0)
-            detected_category = "Credential Phishing"
-            reasons.append(f"Link contains deceptive credential keywords: {domain['url']}")
+            scam_score = max(scam_score, 90.0)
+            detected_category = "Credential Phishing Gateway"
+            reasons.append(f"Link domain contains deceptive authentication keywords: {domain['url']}")
 
-    # 5. Synthetic Screenshot Factor
+    # 6. Synthetic Screenshot Factor
     if is_synthetic:
         scam_score = max(scam_score, 85.0)
         if not detected_category or detected_category == "Legitimate / Safe":
             detected_category = "Synthetic / Altered Receipt"
-        reasons.append("Detected compression and variance patterns typical of generated fake payment receipts.")
+        reasons.append("Visual compression and noise variance match synthetically generated transaction proofs.")
 
-    # 6. Score Consolidation
+    # 7. Score Consolidation & Risk Level Mapping
     if scam_score > 0:
         final_score = max(ml_score, scam_score)
         category = detected_category
