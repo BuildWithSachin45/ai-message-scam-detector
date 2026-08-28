@@ -4,7 +4,6 @@ import pickle
 import numpy as np
 from PIL import Image, ImageStat
 
-# Model artifact paths
 TEXT_MODEL_PATH = 'scam_model.pkl'
 VECTORIZER_PATH = 'vectorizer.pkl'
 IMAGE_MODEL_PATH = 'image_model.pkl'
@@ -25,9 +24,6 @@ if os.path.exists(IMAGE_MODEL_PATH):
 
 
 def check_synthetic_image(image_path):
-    """
-    Evaluates whether an image or receipt is authentic or synthetically generated.
-    """
     if not image_path or not os.path.exists(image_path):
         return {"is_synthetic": False, "confidence": 0}
 
@@ -67,14 +63,9 @@ def check_synthetic_image(image_path):
 
 
 def analyze_content(raw_text, domain_inspections, is_synthetic=False):
-    """
-    Analyzes threat signatures, phishing lures, and legitimate transactional
-    formats across Phase 1 and Phase 2 benchmarks to output risk scores.
-    """
     reasons = []
     category = "Legitimate / Safe"
     
-    # Normalize whitespace, linebreaks, and lowercase
     normalized_text = " ".join(raw_text.split()).lower()
 
     # 1. Base ML Probability
@@ -83,9 +74,8 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
         text_vec = vectorizer.transform([raw_text])
         ml_score = float(text_model.predict_proba(text_vec)[0][1] * 100)
 
-    # 2. Comprehensive Scam Triggers (Phase 1 & Phase 2)
+    # 2. Comprehensive Scam Triggers
     scam_triggers = [
-        # Two-way communication & SMS reply phishing (Phase 2 #5, #6, #10, #12, #18)
         (
             r"please reply (yes|with|to)\b.*(representative|assist|verification code|transaction)",
             90.0,
@@ -128,8 +118,6 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Order Cancellation / Payment Phishing",
             "Creates urgency over order cancellation to solicit payment re-entry."
         ),
-
-        # Authority / Law Enforcement / Digital Arrest Coercion
         (
             r"(police|cbi|customs|court|trai|narcotics).* (illegal transaction|arrested|case|fir|penalty|warrant).* (pay|transfer|immediately|fine)",
             96.0,
@@ -142,8 +130,6 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Digital Arrest / Authority Extortion",
             "Extortion attempt threatening arrest over alleged illegal transactions."
         ),
-
-        # Upfront Fee / Registration / Advance Fee Scams
         (
             r"(earn|work from home|daily income|job|bonus).* (pay|registration fee|deposit|charge)",
             93.0,
@@ -168,8 +154,6 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Government Scheme Phishing",
             "Demands verification charges and sensitive credentials for alleged government benefits."
         ),
-
-        # Credential, OTP, PIN, Card Theft & Harvesting
         (
             r"(send|tell us|provide|share|confirm).*(otp|verification code|pin|card details|cvv|expiry date)",
             98.0,
@@ -182,8 +166,6 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Account Takeover / OTP Phishing",
             "Deceptive security alert soliciting OTP/verification codes to hijack accounts."
         ),
-
-        # Service / Utility / Account Termination & Urgent Deadlines
         (
             r"(disconnected|stop working|deactivated|cancelled|blocked|deleted|locked).* (in \d+ (hours?|minutes?)|tonight|today|immediately|unless you pay).* (pay|link|call|provide|confirm)",
             95.0,
@@ -202,16 +184,12 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             "Account Takeover Phishing",
             "Deceptive deactivation threat prompting links or credential entry."
         ),
-
-        # Impersonation & Accidental Transfer / Return UPI Scam
         (
             r"(accidentally received|by mistake|lost my phone).* (return|transfer|send).* (upi|id|account)",
             90.0,
             "Impersonation / False Refund Scam",
             "Deceptive claim of mistaken money transfer soliciting urgent UPI payments."
         ),
-
-        # Package / Delivery Address Reschedule Fee
         (
             r"(package|parcel) could not be delivered.* pay .* (reschedule|link)",
             92.0,
@@ -229,7 +207,7 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
                 detected_category = cat
             reasons.append(desc)
 
-    # 3. Legitimate Whitelist Patterns (Phase 1 & Phase 2)
+    # 3. Legitimate Whitelist Patterns
     legit_rules = [
         (r"(do not|don'?t|never) share (this|your)? ?otp", "Official security advisory instructing user not to share OTP."),
         (r"if this was (you|not you).* (no action is needed|review your recent activity)", "Standard legitimate login / sign-in notification."),
@@ -280,7 +258,7 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             reasons.append(f"Insecure HTTP connection detected (missing SSL/HTTPS): {domain['url']}")
 
         if domain.get('has_phish_words'):
-            scam_score = max(scam_score, 85.0)
+            scam_score = max(scam_score, 88.0)
             detected_category = "Credential Phishing"
             reasons.append(f"Link contains deceptive credential keywords: {domain['url']}")
 
@@ -291,7 +269,7 @@ def analyze_content(raw_text, domain_inspections, is_synthetic=False):
             detected_category = "Synthetic / Altered Receipt"
         reasons.append("Detected compression and variance patterns typical of generated fake payment receipts.")
 
-    # 6. Score Consolidation & Risk Level Mapping
+    # 6. Score Consolidation
     if scam_score > 0:
         final_score = max(ml_score, scam_score)
         category = detected_category
