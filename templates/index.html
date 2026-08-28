@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishGuard AI - Scam & Phishing Intelligence Platform</title>
+  <!-- Bootstrap 5 CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Export Engines (PDF & Image Canvas) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --primary-blue: #0284c7;
+      --primary-dark-blue: #0369a1;
+      --accent-green: #10b981;
+      --accent-dark-green: #059669;
+      --bg-surface: #0f172a;
+      --card-bg: #ffffff;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f0fdf4;
+      color: #0f172a;
+      min-height: 100vh;
+    }
+    .navbar-brand {
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .hero-badge {
+      background-color: #e0f2fe;
+      color: var(--primary-dark-blue);
+      font-weight: 600;
+      font-size: 0.85rem;
+      border: 1px solid #bae6fd;
+    }
+    .main-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.05), 0 8px 10px -6px rgba(16, 185, 129, 0.05);
+    }
+    .drop-zone {
+      border: 2px dashed #93c5fd;
+      border-radius: 14px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--primary-blue);
+      background-color: #e0f2fe;
+    }
+    .btn-primary-custom {
+      background-color: var(--primary-blue);
+      border-color: var(--primary-blue);
+      color: #ffffff;
+      font-weight: 600;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+    }
+    .btn-primary-custom:hover {
+      background-color: var(--primary-dark-blue);
+      border-color: var(--primary-dark-blue);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .risk-meter {
+      height: 28px;
+      border-radius: 14px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .risk-meter-fill {
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .report-card {
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+    }
+    .action-btn {
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 8px 14px;
+    }
+    code {
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar navbar-expand-lg py-3 mb-4 shadow-sm" style="background: #0f172a !important;">
+    <div class="container" style="max-width: 960px;">
+      <a class="navbar-brand d-flex align-items-center gap-2 text-white" href="#">
+        <div class="rounded-3 p-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #0284c7;">
+          <i class="bi bi-shield-check fs-5 text-white"></i>
+        </div>
+        <span>PhishGuard<span style="color: #38bdf8;">.AI</span></span>
+      </a>
+      <span class="badge border px-3 py-2 rounded-pill small" style="background-color: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3) !important;">
+        <i class="bi bi-broadcast me-1"></i>Live Threat Scanner
+      </span>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container mb-5" style="max-width: 960px;">
+    
+    <!-- Title Area -->
+    <div class="text-center mb-4">
+      
+      <h2 class="fw-bold text-slate-900 mb-2">AI Scam Detector</h2>
+      <p class="text-muted small mx-auto" style="max-width: 600px;">
+        Scan suspicious messages, links, and payment screenshots in seconds
+      </p>
+    </div>
+
+    <!-- Input Scanner Card -->
+    <div class="main-card p-4 p-md-5 mb-4">
+      <div class="row g-4">
+        
+        <!-- Text Input -->
+        <div class="col-12">
+          <label class="form-label fw-bold small text-uppercase tracking-wide" style="color: #0369a1;">1. Message / Email Text</label>
+          <textarea id="textInput" class="form-control rounded-3 p-3" rows="3" placeholder="Paste SMS, WhatsApp alert, bank message, or urgent notification text here..."></textarea>
+        </div>
+
+        <!-- Screenshot Upload -->
+        <div class="col-12">
+          <label class="form-label fw-bold small text-uppercase tracking-wide" style="color: #0369a1;">2. Screenshot </label>
+          <div class="drop-zone p-4 text-center" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <i class="bi bi-cloud-arrow-up fs-1 mb-2 d-inline-block" style="color: #0284c7;"></i>
+            <h6 class="fw-bold mb-1">Click to upload or press <kbd class="bg-dark text-white">Ctrl + V</kbd> to paste screenshot</h6>
+            <p class="text-muted small mb-0">Supports PNG, JPG, JPEG, WEBP (Max 16 MB)</p>
+            <input type="file" id="fileInput" class="d-none" accept="image/*">
+          </div>
+
+          <!-- Live Image Preview Container -->
+          <div id="previewContainer" class="d-none mt-3 p-3 bg-light border rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+              <img id="imagePreview" class="rounded border me-3 bg-white" style="height: 60px; width: 60px; object-fit: cover;">
+              <div>
+                <p id="previewFilename" class="fw-bold mb-0 text-truncate small" style="max-width: 250px;">screenshot.png</p>
+                <span class="badge small" style="background-color: rgba(16, 185, 129, 0.15); color: #059669;">Ready for OCR & Image Scanning</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="removeImage()">
+              <i class="bi bi-trash3 me-1"></i>Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="col-12">
+          <button id="analyzeBtn" class="btn btn-primary-custom w-100 py-3 shadow-sm d-flex align-items-center justify-content-center gap-2" onclick="runAnalysis()">
+            <i class="bi bi-cpu-fill fs-5"></i>
+            <span>Run Multi-Modal Analysis</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety Notice -->
+<div class="alert alert-warning mt-3 mb-0 rounded-3 border-warning">
+  <strong>⚠️ Safety Notice:</strong> This AI prediction is for guidance only and may contain errors.
+  Do not share passwords, OTPs, PINs, or payment information based solely on this result.
+  Verify suspicious requests through official channels.
+</div>
+
+    <!-- Results Area -->
+    <div id="resultsWrapper" class="d-none">
+      
+      <!-- Exportable Report Card -->
+      <div id="reportExportArea" class="report-card p-4 p-md-5 mb-4 shadow-sm" style="background-color: #ffffff;">
+        
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom pb-3 mb-4">
+          <div>
+            <span class="badge bg-dark text-white px-3 py-1 rounded-pill small mb-1">Incident Assessment ID: #<span id="incidentId">84920</span></span>
+            <h4 class="fw-bold mb-0 mt-1">Threat Analysis Report</h4>
+          </div>
+          <span id="categoryBadge" class="badge fs-6 py-2 px-3 rounded-pill text-white" style="background-color: #0284c7;">Bank / UPI Phishing</span>
+        </div>
+
+        <!-- Risk Progress Bar (Restricted to Red, Green, Yellow) -->
+        <div class="mb-4">
+          <div class="d-flex justify-content-between fw-bold small text-secondary mb-2">
+            <span>CALCULATED THREAT PROBABILITY</span>
+            <span id="riskLabel" class="fw-bold" style="color: #dc2626;">85% High Threat</span>
+          </div>
+          <div class="risk-meter">
+            <div id="riskBar" class="progress-bar risk-meter-fill fw-bold text-white d-flex align-items-center justify-content-center" role="progressbar" style="width: 0%;">
+              0%
+            </div>
+          </div>
+        </div>
+
+        <!-- Explainable AI (XAI) Reasons -->
+        <div class="mb-4">
+          <h6 class="fw-bold text-dark d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-shield-exclamation" style="color: #0284c7;"></i>
+            <span>Explainable AI (XAI) Indicators</span>
+          </h6>
+          <div id="reasonsContainer" class="d-flex flex-column gap-2"></div>
+        </div>
+
+        <!-- Extracted URLs & Domains -->
+        <div class="mb-4">
+          <h6 class="fw-bold text-dark d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-link-45deg" style="color: #059669;"></i>
+            <span>Optical Link Extraction & Domain Reputation</span>
+          </h6>
+          <div id="urlContainer" class="border rounded-3 p-3" style="background-color: #f8fafc;"></div>
+        </div>
+
+        <!-- Synthetic Media Tag -->
+        <div id="syntheticContainer" class="mb-2"></div>
+
+      </div>
+
+      <!-- Action Toolbar (Blue & Green Theme) -->
+      <div class="main-card p-4 mb-4">
+        <h6 class="fw-bold text-uppercase small mb-3" style="color: #0369a1;">Quick Actions & Safety Escalation</h6>
+        <div class="d-flex flex-wrap gap-2">
+          
+          <!-- Download PDF -->
+          <button class="btn btn-outline-primary action-btn" onclick="downloadPDF()">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Download PDF
+          </button>
+
+          <!-- Download PNG Image -->
+          <button class="btn btn-outline-success action-btn" onclick="downloadImage()">
+            <i class="bi bi-file-earmark-image-fill me-1"></i>Download Image (.PNG)
+          </button>
+
+          <!-- Share Report (Mobile/Web Share API) -->
+          <button class="btn action-btn text-white" style="background-color: #0284c7;" onclick="shareReportCard()">
+            <i class="bi bi-share-fill me-1"></i>Share Report
+          </button>
+
+          <!-- WhatsApp Share -->
+          <button class="btn action-btn text-white" style="background-color: #059669;" onclick="shareWhatsApp()">
+            <i class="bi bi-whatsapp me-1"></i>Share via WhatsApp
+          </button>
+
+          <!-- Emergency Action Modal Trigger -->
+          <button class="btn btn-outline-danger action-btn" onclick="toggleEmergency()">
+            <i class="bi bi-shield-fill-x me-1"></i>I Clicked the Link!
+          </button>
+
+          <!-- Cybercrime Portal Copy -->
+          <button class="btn btn-outline-dark action-btn" onclick="copyCybercrimeSummary()">
+            <i class="bi bi-clipboard2-check-fill me-1"></i>Copy Complaint Text
+          </button>
+
+          <!-- Portal Link -->
+          <a href="https://cybercrime.gov.in" target="_blank" class="btn btn-outline-secondary action-btn">
+            <i class="bi bi-box-arrow-up-right me-1"></i>cybercrime.gov.in (1930)
+          </a>
+        </div>
+
+        <!-- Emergency Checklist Panel -->
+        <div id="emergencySteps" class="alert alert-danger mt-4 d-none border-danger shadow-sm rounded-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+            <h6 class="fw-bold mb-0">Post-Click Incident Mitigation Checklist</h6>
+          </div>
+          <ol class="mb-0 small ps-3">
+            <li class="mb-1"><strong>Immediate Isolation:</strong> Turn on Airplane Mode or disconnect from Wi-Fi immediately to cut off potential remote access payloads.</li>
+            <li class="mb-1"><strong>Financial Safeguard:</strong> Open your banking app from an alternate device to temporarily lock debit/credit cards and disable UPI transactions.</li>
+            <li class="mb-1"><strong>Credential Rotation:</strong> Change critical passwords for primary email and banking credentials from a secure device.</li>
+            <li class="mb-0"><strong>Escalate & Report:</strong> Call national helpline <strong>1930</strong> or register a grievance at <strong>cybercrime.gov.in</strong> with the copied complaint summary.</li>
+          </ol>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let currentFile = null;
+
+    // Clipboard Paste (Ctrl+V) listener
+    window.addEventListener('paste', e => {
+      const items = (e.clipboardData || window.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          currentFile = items[i].getAsFile();
+          showPreview(currentFile, "Pasted_Screenshot_" + Date.now() + ".png");
+          break;
+        }
+      }
+    });
+
+    // File Input change listener
+    document.getElementById('fileInput').addEventListener('change', e => {
+      if (e.target.files && e.target.files[0]) {
+        currentFile = e.target.files[0];
+        showPreview(currentFile, currentFile.name);
+      }
+    });
+
+    function showPreview(file, name) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('imagePreview').src = e.target.result;
+        document.getElementById('previewFilename').innerText = name;
+        document.getElementById('previewContainer').classList.remove('d-none');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeImage() {
+      currentFile = null;
+      document.getElementById('fileInput').value = '';
+      document.getElementById('previewContainer').classList.add('d-none');
+    }
+
+    // Run Analysis API Call
+    async function runAnalysis() {
+      const textVal = document.getElementById('textInput').value.trim();
+      if (!textVal && !currentFile) {
+        alert("Please enter message text or upload/paste a screenshot to analyze.");
+        return;
+      }
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Extracting Optical Data & Scoring Risk...`;
+
+      const formData = new FormData();
+      formData.append('text', textVal);
+      if (currentFile) formData.append('image', currentFile);
+
+      try {
+        const res = await fetch('/analyze', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'error') {
+          alert(data.message);
+          return;
+        }
+
+        renderDashboard(data);
+      } catch (err) {
+        alert("An error occurred during scanning. Ensure the Flask server is running.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="bi bi-cpu-fill fs-5"></i><span>Run Multi-Modal Analysis</span>`;
+      }
+    }
+
+    function renderDashboard(data) {
+      const analysis = data.analysis;
+      document.getElementById('resultsWrapper').classList.remove('d-none');
+      document.getElementById('incidentId').innerText = Math.floor(10000 + Math.random() * 90000);
+
+      // Category & Badge
+      const badge = document.getElementById('categoryBadge');
+      badge.innerText = `${analysis.category} (${analysis.risk_level})`;
+
+      // Risk Bar & Meter (STRICT COLOR LOGIC: Red, Yellow, Green ONLY)
+      const bar = document.getElementById('riskBar');
+      const label = document.getElementById('riskLabel');
+      bar.style.width = analysis.risk_score + '%';
+      bar.innerText = analysis.risk_score + '% Threat Score';
+      label.innerText = `${analysis.risk_score}% • ${analysis.risk_level}`;
+
+      if (analysis.risk_score >= 75) {
+        bar.style.backgroundColor = '#dc2626'; // Red
+        bar.className = 'progress-bar risk-meter-fill text-white';
+        badge.style.backgroundColor = '#dc2626';
+        label.style.color = '#dc2626';
+      } else if (analysis.risk_score >= 40) {
+        bar.style.backgroundColor = '#eab308'; // Yellow
+        bar.className = 'progress-bar risk-meter-fill text-dark';
+        badge.style.backgroundColor = '#eab308';
+        badge.className = 'badge fs-6 py-2 px-3 rounded-pill text-dark';
+        label.style.color = '#ca8a04';
+      } else {
+        bar.style.backgroundColor = '#16a34a'; // Green
+        bar.className = 'progress-bar risk-meter-fill text-white';
+        badge.style.backgroundColor = '#16a34a';
+        label.style.color = '#16a34a';
+      }
+
+      // XAI Indicators
+      const reasonsContainer = document.getElementById('reasonsContainer');
+      reasonsContainer.innerHTML = analysis.reasons.map(r => `
+        <div class="p-3 border rounded-3 d-flex align-items-center gap-2 small" style="background-color: #f8fafc; border-color: #cbd5e1 !important;">
+          <i class="bi bi-exclamation-triangle-fill flex-shrink-0" style="color: #0284c7;"></i>
+          <span>${r}</span>
+        </div>
+      `).join('');
+
+      // Extracted URLs
+      const urlContainer = document.getElementById('urlContainer');
+      if (data.domain_inspections && data.domain_inspections.length > 0) {
+        urlContainer.innerHTML = data.domain_inspections.map(u => `
+          <div class="p-2 mb-2 bg-white border rounded d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <code class="fw-bold" style="color: #0284c7;">${u.url}</code>
+            </div>
+            <div class="d-flex gap-1">
+              <span class="badge ${u.is_insecure_http ? 'bg-danger' : 'bg-success'}">${u.is_insecure_http ? 'No SSL (HTTP)' : 'HTTPS Secure'}</span>
+              <span class="badge ${u.is_ip ? 'bg-danger' : 'bg-secondary'}">${u.is_ip ? 'Direct IP Host' : 'Domain Host'}</span>
+              ${u.has_phish_words ? '<span class="badge bg-warning text-dark">Suspicious Keywords</span>' : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        urlContainer.innerHTML = `<p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>No clickable or embedded links detected in content.</p>`;
+      }
+
+      // Synthetic Media Indicator
+      const synthContainer = document.getElementById('syntheticContainer');
+      if (data.synthetic_detection && data.synthetic_detection.is_synthetic) {
+        synthContainer.innerHTML = `
+          <div class="alert alert-warning d-flex align-items-center gap-2 mb-0 rounded-3">
+            <i class="bi bi-robot fs-5"></i>
+            <div><strong>Synthetic Artifact Alert:</strong> Visual noise and pixel variance match characteristics of generated fake receipts.</div>
+          </div>
+        `;
+      } else {
+        synthContainer.innerHTML = '';
+      }
+
+      document.getElementById('resultsWrapper').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // FIXED PDF Download Function
+    function downloadPDF() {
+      const element = document.getElementById('reportExportArea');
+      
+      const opt = {
+        margin:       [0.2, 0.2, 0.2, 0.2],
+        filename:     `Scam_Assessment_${Date.now()}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+          scale: 2, 
+          useCORS: true, 
+          scrollY: 0,
+          backgroundColor: '#ffffff'
+        },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    }
+
+    // PNG Image Download
+    function downloadImage() {
+      const element = document.getElementById('reportExportArea');
+      html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Threat_Report_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+
+    // Web Share API (Report Sharing)
+    async function shareReportCard() {
+      const element = document.getElementById('reportExportArea');
+      try {
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 });
+        canvas.toBlob(async blob => {
+          const file = new File([blob], 'threat_report.png', { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'AI Scam Assessment Report',
+              text: 'Scam Threat Analysis generated by PhishGuard AI.'
+            });
+          } else if (navigator.share) {
+            await navigator.share({
+              title: 'AI Scam Assessment Report',
+              text: `Warning: Verified scam report flagged as ${document.getElementById('categoryBadge').innerText}. Threat Score: ${document.getElementById('riskLabel').innerText}.`
+            });
+          } else {
+            alert('Web Share is not supported on this browser. Use "Download Image" to save and share manually.');
+          }
+        });
+      } catch (err) {
+        console.error('Sharing failed:', err);
+      }
+    }
+
+    // WhatsApp Message Warning
+    function shareWhatsApp() {
+      const cat = document.getElementById('categoryBadge').innerText;
+      const score = document.getElementById('riskLabel').innerText;
+      const text = encodeURIComponent(`🚨 *PhishGuard AI Scam Alert*\n\nI analyzed a suspicious alert flagged as: *${cat}* (${score}).\n⚠️ Please do not click unverified links, scan random QR codes, or share OTPs/PINs.`);
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
+
+    // Emergency Box Toggle
+    function toggleEmergency() {
+      document.getElementById('emergencySteps').classList.toggle('d-none');
+    }
+
+    // Copy Incident Summary for Cybercrime Reporting
+    function copyCybercrimeSummary() {
+      const cat = document.getElementById('categoryBadge').innerText;
+      const score = document.getElementById('riskLabel').innerText;
+      const textContent = document.getElementById('textInput').value.trim();
+      const summary = `Cybercrime Incident Grievance Summary:\n- Classification: Phishing / Financial Fraud\n- Detected Threat Category: ${cat}\n- Calculated Risk Probability: ${score}\n- Scanned Content:\n"${textContent}"\n- Escalation Reference: 1930 / https://cybercrime.gov.in`;
+      
+      navigator.clipboard.writeText(summary).then(() => {
+        alert("Pre-formatted grievance summary copied to clipboard! Ready to paste on cybercrime.gov.in.");
+      });
+    }
+  </script>
+</body>
+</html>
