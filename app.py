@@ -1,4 +1,5 @@
 import os
+import gc
 import uuid
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
@@ -32,13 +33,13 @@ def analyze():
     synthetic_result = {"is_synthetic": False, "confidence": 0}
     has_image = False
 
-    # 1. Analyze URLs from Pasted Text
+    # 1. Inspect text URLs
     if raw_text:
         text_urls = extract_urls(raw_text)
         text_domain_reports = inspect_domain_security(text_urls)
         all_domain_inspections.extend(text_domain_reports)
 
-    # 2. Analyze Screenshot (OCR + Image URLs + Synthetic Artifacts)
+    # 2. Process image with auto-cleanup
     if image_file and image_file.filename != '':
         if allowed_file(image_file.filename):
             has_image = True
@@ -52,7 +53,6 @@ def analyze():
                 ocr_extracted_text = ocr_result.get('text', '')
                 img_domains = ocr_result.get('urls', [])
                 
-                # Merge domains avoiding duplicates
                 existing_urls = {d['url'] for d in all_domain_inspections}
                 for d in img_domains:
                     if d['url'] not in existing_urls:
@@ -62,7 +62,12 @@ def analyze():
                 synthetic_result = check_synthetic_image(file_path)
             finally:
                 if os.path.exists(file_path):
-                    os.remove(file_path)
+                    try:
+                        os.remove(file_path)
+                    except OSError:
+                        pass
+                # Force immediate memory reclamation
+                gc.collect()
         else:
             return jsonify({
                 "status": "error",
@@ -77,7 +82,6 @@ def analyze():
             "message": "Please enter message text or upload a screenshot to analyze."
         }), 400
 
-    # 3. Multi-Modal Risk Analysis
     analysis = analyze_content(
         raw_text=combined_text,
         domain_inspections=all_domain_inspections,
