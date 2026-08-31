@@ -15,6 +15,9 @@ elif os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
 
 
 def clean_ocr_typos(text):
+    """
+    Normalizes common OCR character misreads (e.g. 0TP -> OTP, p1n -> pin, l1nk -> link).
+    """
     if not text:
         return ""
     cleaned = text
@@ -36,57 +39,77 @@ def clean_ocr_typos(text):
 
 
 def extract_urls(text):
-    url_pattern = r'((?:https?://|www\.)[^\s/$.?#].[^\s]*|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?::\d+)?)'
-    matches = re.findall(url_pattern, text)
+    """
+    Extracts all HTTP/HTTPS links, bare domains, and IP endpoints from raw/OCR text.
+    """
+    if not text:
+        return []
+    url_pattern = r'((?:https?://|www\.)[^\s/$.?#].[^\s]*|[a-zA-Z0-9-]+\.(?:com|org|net|in|co|info|biz|xyz|top|site|live|click|app|online|cc|pw|icu|rest|club|link|vip|store)(?:/[^\s]*)?|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?::\d+)?(?:/[^\s]*)?)'
+    matches = re.findall(url_pattern, text, flags=re.IGNORECASE)
     clean_urls = []
     for match in matches:
-        cleaned = re.sub(r'[.,;:)\'\"\s]+$', '', match)
+        cleaned = re.sub(r'[.,;:)\'\"\s>]+$', '', match)
         if cleaned and cleaned not in clean_urls:
             clean_urls.append(cleaned)
     return clean_urls
 
 
 def inspect_domain_security(url_list):
+    """
+    Deep heuristic inspection of URL structure, brand-squatting, protocol safety, and TLDs.
+    """
     inspections = []
-    suspicious_keywords = ['verify', 'login', 'secure', 'update', 'kyc', 'bank', 'upi', 'claim', 'bonus', 'free', 'sbi', 'portal']
-    
+    suspicious_auth_keywords = ['verify', 'login', 'secure', 'update', 'kyc', 'bank', 'upi', 'claim', 'bonus', 'free', 'sbi', 'portal', 'reward', 'refund', 'pan', 'aadhaar']
+    suspicious_tlds = ['.xyz', '.top', '.click', '.site', '.live', '.online', '.cc', '.pw', '.icu', '.rest', '.club', '.link', '.vip', '.work']
+    trusted_domains = ['amazon.in', 'amazon.com', 'sbi.co.in', 'onlinesbi.sbi', 'netflix.com', 'cybercrime.gov.in', 'gov.in', 'nic.in']
+
     for url in url_list:
         parse_target = url if (url.startswith('http://') or url.startswith('https://')) else f'http://{url}'
         parsed = urlparse(parse_target)
-        hostname = parsed.hostname or parsed.netloc or ''
-        is_ip = bool(re.match(r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', hostname))
-        is_insecure_http = url.startswith('http://')
-        has_phish_words = any(word in url.lower() for word in suspicious_keywords)
+        hostname = (parsed.hostname or parsed.netloc or '').lower()
         
+        is_ip = bool(re.match(r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', hostname))
+        is_insecure_http = url.lower().startswith('http://') and not is_ip
+        has_phish_words = any(word in url.lower() for word in suspicious_auth_keywords)
+        has_suspicious_tld = any(hostname.endswith(tld) for tld in suspicious_tlds)
+        
+        # Detect brand impersonation (e.g., "sbi-secure-login.example.com")
+        impersonated_brand = None
+        for brand in ['sbi', 'amazon', 'netflix', 'paytm', 'phonepe', 'hdfc', 'icici', 'axis']:
+            if brand in hostname and not any(hostname.endswith(td) for td in trusted_domains):
+                impersonated_brand = brand.upper()
+                break
+
         inspections.append({
             'url': url,
             'hostname': hostname,
             'is_ip': is_ip,
             'is_insecure_http': is_insecure_http,
-            'has_phish_words': has_phish_words
+            'has_phish_words': has_phish_words,
+            'has_suspicious_tld': has_suspicious_tld,
+            'impersonated_brand': impersonated_brand
         })
     return inspections
 
 
 def process_screenshot(image_path):
+    """
+    Memory-efficient, multi-mode OCR extraction with contrast enhancement.
+    """
     extracted_text = ""
-    
     try:
         with Image.open(image_path) as raw_img:
-            # Downscale large mobile images to fit within safe memory limits (max 1200px)
             raw_img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
             img_gray = raw_img.convert('L')
             
-            # Check for dark mode background
+            # Dark mode detection
             stat = ImageStat.Stat(img_gray)
             if stat.mean[0] < 115:
                 img_gray = ImageOps.invert(img_gray)
                 
-            # Enhance contrast
             enhancer = ImageEnhance.Contrast(img_gray)
             enhanced = enhancer.enhance(1.8).filter(ImageFilter.SHARPEN)
             
-            # Run single optimized OCR pass
             raw_ocr = pytesseract.image_to_string(enhanced, config='--oem 3 --psm 6')
             if not raw_ocr.strip():
                 raw_ocr = pytesseract.image_to_string(enhanced, config='--oem 3 --psm 11')
