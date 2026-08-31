@@ -14,5 +14,5 @@ COPY . .
 
 EXPOSE 5000
 
-# 1 worker, 2 threads, 60s timeout to protect Render free-tier RAM
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "60", "app:app"]
+# Auto-recycles worker after 25 requests to prevent 512MB RAM exhaustion
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "--timeout", "120", "--max-requests", "10", "--max-requests-jitter", "2", "app:app"]
