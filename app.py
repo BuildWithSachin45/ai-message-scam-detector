@@ -3,7 +3,7 @@ import uuid
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 
-from ocr_engine import process_screenshot
+from ocr_engine import process_screenshot, extract_urls, inspect_domain_security
 from detector import check_synthetic_image, analyze_content
 
 app = Flask(__name__)
@@ -28,10 +28,17 @@ def analyze():
     image_file = request.files.get('image')
 
     ocr_extracted_text = ""
-    domain_inspections = []
+    all_domain_inspections = []
     synthetic_result = {"is_synthetic": False, "confidence": 0}
     has_image = False
 
+    # 1. Analyze URLs from Pasted Text
+    if raw_text:
+        text_urls = extract_urls(raw_text)
+        text_domain_reports = inspect_domain_security(text_urls)
+        all_domain_inspections.extend(text_domain_reports)
+
+    # 2. Analyze Screenshot (OCR + Image URLs + Synthetic Artifacts)
     if image_file and image_file.filename != '':
         if allowed_file(image_file.filename):
             has_image = True
@@ -43,7 +50,15 @@ def analyze():
             try:
                 ocr_result = process_screenshot(file_path)
                 ocr_extracted_text = ocr_result.get('text', '')
-                domain_inspections = ocr_result.get('urls', [])
+                img_domains = ocr_result.get('urls', [])
+                
+                # Merge domains avoiding duplicates
+                existing_urls = {d['url'] for d in all_domain_inspections}
+                for d in img_domains:
+                    if d['url'] not in existing_urls:
+                        all_domain_inspections.append(d)
+                        existing_urls.add(d['url'])
+
                 synthetic_result = check_synthetic_image(file_path)
             finally:
                 if os.path.exists(file_path):
@@ -56,17 +71,16 @@ def analyze():
 
     combined_text = f"{raw_text} {ocr_extracted_text}".strip()
 
-    # Allow processing if either text was provided, OCR succeeded, OR an image was uploaded
     if not combined_text and not has_image:
         return jsonify({
             "status": "error",
-            "message": "Please provide a text message or a valid screenshot to analyze."
+            "message": "Please enter message text or upload a screenshot to analyze."
         }), 400
 
-    # Run detection pipeline
+    # 3. Multi-Modal Risk Analysis
     analysis = analyze_content(
         raw_text=combined_text,
-        domain_inspections=domain_inspections,
+        domain_inspections=all_domain_inspections,
         is_synthetic=synthetic_result.get("is_synthetic", False)
     )
 
@@ -74,7 +88,7 @@ def analyze():
         "status": "success",
         "combined_text": combined_text,
         "ocr_text": ocr_extracted_text,
-        "domain_inspections": domain_inspections,
+        "domain_inspections": all_domain_inspections,
         "synthetic_detection": synthetic_result,
         "analysis": analysis
     })
